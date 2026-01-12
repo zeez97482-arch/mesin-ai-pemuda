@@ -10,29 +10,46 @@ const TOKEN = "r8_WXtSArWDLewNye4bLacN2rSpSMoSWQh1VMWgo";
 
 app.post("/generate-video", async (req, res) => {
     try {
-        // ... kode fetch yang tadi ...
-const data = await response.json();
-console.log("Respon Replicate:", JSON.stringify(data)); // Untuk cek di log Render
+        const { image, prompt } = req.body;
+        console.log("Memulai request ke Replicate untuk:", prompt);
 
-// Perbaikan cara mengambil URL Video
-let videoUrl = "";
-if (data.output) {
-    if (Array.isArray(data.output)) {
-        videoUrl = data.output[0]; // Jika hasil dalam list
-    } else {
-        videoUrl = data.output; // Jika hasil langsung link
+        const response = await fetch("https://api.replicate.com/v1/models/wan-video/wan-2.2-i2v-fast/predictions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${TOKEN}`,
+                "Content-Type": "application/json",
+                "Prefer": "wait"
+            },
+            body: JSON.stringify({
+                input: {
+                    image: image,
+                    prompt: prompt,
+                    aspect_ratio: "1:1" // Tambahan parameter standar Wan AI
+                }
+            })
+        });
+
+        const data = await response.json();
+        console.log("Respon dari Replicate:", JSON.stringify(data));
+
+        // Mencari URL video di berbagai kemungkinan struktur data
+        let videoUrl = null;
+        if (data.output) {
+            videoUrl = Array.isArray(data.output) ? data.output[0] : data.output;
+        }
+
+        if (videoUrl && typeof videoUrl === 'string') {
+            console.log("Video berhasil didapat:", videoUrl);
+            res.json({ videoUrl: videoUrl });
+        } else {
+            console.error("Link video tidak ditemukan dalam respon.");
+            res.status(500).json({ error: "API tidak mengembalikan video. Cek saldo Replicate Anda." });
+        }
+    } catch (error) {
+        console.error("Error Sistem:", error);
+        res.status(500).json({ error: "Sistem sibuk, coba lagi." });
     }
-}
-
-if (videoUrl) {
-    res.json({ videoUrl: videoUrl });
-} else {
-    // Jika Replicate memberikan error atau status gagal
-    res.status(500).json({ error: "API tidak mengembalikan video. Cek saldo Replicate." });
-}
 });
 
-// Render akan otomatis mengisi process.env.PORT
-const PORT = process.env.PORT || 10000; 
-app.listen(PORT, '0.0.0.0', () => console.log(`Server Render Aktif`));
-
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => console.log(`Server Aktif di Port ${PORT}`));
