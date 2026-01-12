@@ -11,45 +11,47 @@ const TOKEN = "r8_WXtSArWDLewNye4bLacN2rSpSMoSWQh1VMWgo";
 app.post("/generate-video", async (req, res) => {
     try {
         const { image, prompt } = req.body;
-        console.log("Memulai request ke Replicate untuk:", prompt);
+        console.log("Mengirim permintaan ke Wan-2.2...");
 
         const response = await fetch("https://api.replicate.com/v1/models/wan-video/wan-2.2-i2v-fast/predictions", {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${TOKEN}`,
                 "Content-Type": "application/json",
-                "Prefer": "wait"
+                "Prefer": "wait" // Memaksa Replicate menunggu sampai video jadi
             },
             body: JSON.stringify({
                 input: {
                     image: image,
                     prompt: prompt,
-                    aspect_ratio: "1:1" // Tambahan parameter standar Wan AI
+                    frames_num: 81, // Standar Wan Video
+                    aspect_ratio: "1:1"
                 }
             })
         });
 
         const data = await response.json();
-        console.log("Respon dari Replicate:", JSON.stringify(data));
+        console.log("Respon Replicate:", data);
 
-        // Mencari URL video di berbagai kemungkinan struktur data
-        let videoUrl = null;
+        // Pencarian URL Video yang lebih teliti
+        let videoUrl = "";
         if (data.output) {
             videoUrl = Array.isArray(data.output) ? data.output[0] : data.output;
+        } else if (data.urls && data.urls.get) {
+            // Jika video belum jadi, kita beri tahu user untuk tunggu
+            return res.status(202).json({ error: "Video sedang diproses, coba klik lagi dalam 10 detik." });
         }
 
-        if (videoUrl && typeof videoUrl === 'string') {
-            console.log("Video berhasil didapat:", videoUrl);
+        if (videoUrl && videoUrl.startsWith('http')) {
             res.json({ videoUrl: videoUrl });
         } else {
-            console.error("Link video tidak ditemukan dalam respon.");
-            res.status(500).json({ error: "API tidak mengembalikan video. Cek saldo Replicate Anda." });
+            res.status(500).json({ error: "API Sibuk: Saldo Replicate habis atau Token salah." });
         }
     } catch (error) {
-        console.error("Error Sistem:", error);
-        res.status(500).json({ error: "Sistem sibuk, coba lagi." });
+        console.error("SERVER ERROR:", error);
+        res.status(500).json({ error: "Koneksi ke AI terputus." });
     }
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Server Aktif di Port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Server Jalan di Port ${PORT}`));
